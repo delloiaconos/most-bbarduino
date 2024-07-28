@@ -4,19 +4,22 @@
 
 
 /* SD Card Chip Select */
-#define SD_CS  2
+#define SD_CS  10
 
 /* PDM Configuration constants */
 #define PDM_FS 16000  // Sampling Frequency [Hz]
 #define PDM_CH 1      // Number of channels
 
+
+// Create e new type, for holding together:
+// - PDM buffer size, for raw data
+// - Buffer size, for elborated audio data
 typedef struct buff_conf_s {
   uint32_t pdm_size;
   uint32_t buff_len;
 } buff_conf_t;
 
-
-
+// The create an array of configurations, using the type defined above
 buff_conf_t configs[] = { {256, 512}, {256, 1024}, {256, 2048}, {256, 4096}, 
                           {512, 512}, {512, 1024}, {512, 2048}, {512, 4096},
                           {1024, 1024}, {1024, 2048}, {1024, 4096}, 
@@ -42,13 +45,16 @@ File audioFile;
 int audioFileInx = 0;  // Index for audio files
 
 /* PDM Callback */
+// Callback function, called when new PDM data are available
 void onPDMdata() {
+
+  static int status = 0;
   static uint32_t istart = 0;
 
   // Query the number of available bytes
   int bytesAvailable = PDM.available();
 
-  // Read into the sample buffer
+  // Read into the sample buffer, from istart to istart+bytesAvailable
   PDM.read(&audioBuffer[istart], bytesAvailable);
 
   istart = istart + bytesAvailable;
@@ -59,10 +65,23 @@ void onPDMdata() {
     istart = 0;
   }
 
+  if (status == 0) {
+    digitalWrite(3, HIGH);
+    status = 1;
+  } else {
+    digitalWrite(3, LOW);
+    status = 0;
+  }
+
 }
 
 
 void setup() {
+
+  pinMode(2, OUTPUT);
+  pinMode(3, OUTPUT);
+
+
 
   // Inizializzo la seriale
   Serial.begin(9600);
@@ -87,6 +106,7 @@ void setup() {
 
   // Optionally set the gain, defaults to 20
   PDM.setGain(0);
+  // Set the size buffers' size, using the ones in configs[], using the index configPtr
   PDM.setBufferSize( configs[configPtr].pdm_size );
   bufferLen = configs[configPtr].buff_len;
 
@@ -102,6 +122,8 @@ void setup() {
     Serial.println(fileName);
   }
 
+  // Increments the index for configs[] 
+  //(if exceed CONFIG_LEN, with % it restarts from 0)
   configPtr = ( configPtr + 1 ) % CONFIG_LEN;
 
   // Initialize PDM with:
@@ -123,8 +145,13 @@ void setup() {
 void loop() {
   // Scrittura dati audio
   if (audioSamples) {
+
+    digitalWrite(2, HIGH);
+
     audioFile.write( (uint8_t*) audioBuffer, audioSamples*2 );
     audioSamples = 0;
+
+    digitalWrite(2, LOW);
   }
 
   // Controlla se è trascorso il tempo di registrazione desiderato
@@ -139,6 +166,7 @@ void loop() {
       Serial.println("Previous audio file closed.");
     }
 
+    // Every 5 seconds, the recording finish and a new one is started, with a new configuration
     Serial.println( "Starting new recording..." );
 
     // Attempt to create a new audio file with a unique name
