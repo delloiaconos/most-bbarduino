@@ -1,9 +1,6 @@
 # MOST-BBArduino
 
-**Version:** 1.0  
-**Author:** Dello Iaconos  
 **Board target:** Arduino Nano 33 BLE Sense (or compatible)  
-**License:** MIT (suggested — add your preferred license here)
 
 ---
 
